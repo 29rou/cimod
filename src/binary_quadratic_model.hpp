@@ -1425,7 +1425,7 @@ public:
         output["quadratic_tail"] = q_tail;
 
         return output;
-    };
+    }
 
     /**
      * @brief Create a BinaryQuadraticModel instance from a serializable object.
@@ -1492,7 +1492,7 @@ public:
         //construct a BinaryQuadraticModel instance
         BinaryQuadraticModel<IndexType_serial, FloatType_serial> bqm(linear, quadratic, offset, vartype, info);
         return bqm;
-    };
+    }
 
 };
 }
