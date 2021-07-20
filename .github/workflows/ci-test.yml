@@ -8,15 +8,15 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        python-version: [3.9]
-        os: [macos-latest]
         include:
         - name: OpenMP-On
           os: macos-latest
           path: ~/Library/Caches/pip
+          python-version: 3.9
         - name: OpenMP-OFF
           os: macos-latest
           path: ~/Library/Caches/pip
+          python-version: 3.9
 
     runs-on: ${{ matrix.os }}
     steps:
