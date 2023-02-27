@@ -318,29 +318,28 @@ class PolynomialModelTest(unittest.TestCase):
     def state_test_bpm(self, bpm, poly: dict, vartype):
         self.assertEqual(bpm.vartype, vartype) #Check Vartype
         self.assertEqual(bpm.num_interactions, len(poly)) #Check the number of the interactions
-        self.assertEqual(bpm.num_variables, len(set(j for i in poly.keys() for j in i))) #Check the number of the variables
-        self.assertEqual(bpm.degree, max([len(i) for i in poly.keys()])) #Check the max degree of the interactions
-        self.assertEqual(bpm.get_variables(), sorted(list(set(j for i in poly.keys() for j in i)))) #Check the variables
+        self.assertEqual(bpm.num_variables, len({j for i in poly for j in i}))
+        self.assertEqual(bpm.degree, max(len(i) for i in poly))
+        self.assertEqual(
+            bpm.get_variables(), sorted(list({j for i in poly for j in i}))
+        )
         self.assertAlmostEqual(bpm.get_offset(), poly[()] if tuple() in poly else 0.0) #Check the offset
         for k, v in bpm.get_polynomial().items():#Check the interactions
             self.assertAlmostEqual(v, poly[k])
 
-        num = 0
-        for i in sorted(list(set(j for i in poly.keys() for j in i))):
+        for num, i in enumerate(sorted(list({j for i in poly for j in i}))):
             self.assertEqual(bpm.get_variables_to_integers(i), num)
             self.assertEqual(bpm.has_variable(i), True)
-            num += 1
-        
-         #Check the specific interactions 
-        for index in poly.keys():
-            self.assertAlmostEqual(bpm.get_polynomial(index)                           , poly[index])
+        for index, value in poly.items():
+            self.assertAlmostEqual(bpm.get_polynomial(index), value)
             self.assertAlmostEqual(bpm.get_polynomial(random.sample(index, len(index))), poly[index])
             self.assertAlmostEqual(bpm.get_polynomial(list(index))                     , poly[index])
             self.assertAlmostEqual(bpm.get_polynomial(key = index)                     , poly[index])
-            if tuple(index) != ():
-                self.assertAlmostEqual(bpm.get_polynomial(*index), poly[index])
-            else:
+            if not tuple(index):
                 self.assertAlmostEqual(bpm.get_polynomial(index), poly[index])
+
+            else:
+                self.assertAlmostEqual(bpm.get_polynomial(*index), poly[index])
 
     def state_test_bpm_empty(self, bpm, vartype):
         self.assertEqual(bpm.vartype, vartype)
@@ -820,37 +819,27 @@ class PolynomialModelTest(unittest.TestCase):
         self.assertListEqual(cimod.BinaryPolynomialModel(self.poly_tuple4, cimod.BINARY).energies(binaries_list), anser_list)
 
     def test_scale_bpm_all_scaled(self):
-        d = {}
-        for k, v in self.poly.items():
-            d[k] = 2*v
+        d = {k: 2*v for k, v in self.poly.items()}
         bpm = cimod.BinaryPolynomialModel(d, cimod.SPIN)
         bpm.scale(0.5)
         self.state_test_bpm(bpm, self.poly, cimod.SPIN)
 
-        d = {}
-        for k, v in self.poly_str.items():
-            d[k] = 2*v
+        d = {k: 2*v for k, v in self.poly_str.items()}
         bpm = cimod.BinaryPolynomialModel(d, cimod.SPIN)
         bpm.scale(0.5)
         self.state_test_bpm(bpm, self.poly_str, cimod.SPIN)
 
-        d = {}
-        for k, v in self.poly_tuple2.items():
-            d[k] = 2*v
+        d = {k: 2*v for k, v in self.poly_tuple2.items()}
         bpm = cimod.BinaryPolynomialModel(d, cimod.SPIN)
         bpm.scale(0.5)
         self.state_test_bpm(bpm, self.poly_tuple2, cimod.SPIN)
 
-        d = {}
-        for k, v in self.poly_tuple3.items():
-            d[k] = 2*v
+        d = {k: 2*v for k, v in self.poly_tuple3.items()}
         bpm = cimod.BinaryPolynomialModel(d, cimod.SPIN)
         bpm.scale(0.5)
         self.state_test_bpm(bpm, self.poly_tuple3, cimod.SPIN)
 
-        d = {}
-        for k, v in self.poly_tuple4.items():
-            d[k] = 2*v
+        d = {k: 2*v for k, v in self.poly_tuple4.items()}
         bpm = cimod.BinaryPolynomialModel(d, cimod.SPIN)
         bpm.scale(0.5)
         self.state_test_bpm(bpm, self.poly_tuple4, cimod.SPIN)

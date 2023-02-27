@@ -21,11 +21,7 @@ def get_state_and_energy(model, result_state, offset=0, model_variables=[]) -> T
     """
     temp_state = {}
 
-    if len(model_variables) != 0:
-        variables = model_variables
-    else:
-        variables = model.variables
-
+    variables = model_variables if len(model_variables) != 0 else model.variables
     def _convert_data(d):
         if d == 0 and model.vartype == cimod.SPIN:
             return -1

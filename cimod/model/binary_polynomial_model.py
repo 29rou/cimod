@@ -41,11 +41,10 @@ class Polynomial:
 
     def get(self, arg1, arg2 = None):
         val = self.__bpm.get_polynomial(arg1)
-        if val == 0.0:
-            if arg2 != None:
-                return arg2
-        else:
+        if val != 0.0:
             return val
+        if arg2 != None:
+            return arg2
         
     def __len__(self):
         return self.__bpm.num_interactions
