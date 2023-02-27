@@ -38,29 +38,28 @@ def make_BinaryQuadraticModel(linear, quadratic):
         index.add(next(iter(quadratic))[0])
         index.add(next(iter(quadratic))[1])
 
-    if len(set(type(i) for i in index)) != 1:
+    if len({type(i) for i in index}) != 1:
         raise TypeError("invalid types of linear and quadratic")
-    else:
+    ind = next(iter(index))
 
-        ind = next(iter(index))
-
-        if isinstance(ind, int):
-            base = cxxcimod.BinaryQuadraticModel_Dict
-        elif isinstance(ind, str):
-            base = cxxcimod.BinaryQuadraticModel_str_Dict
-        elif isinstance(ind, tuple):
-            if len(ind) == 2:
-                base = cxxcimod.BinaryQuadraticModel_tuple2_Dict
-            elif len(ind) == 3:
-                base = cxxcimod.BinaryQuadraticModel_tuple3_Dict
-            elif len(ind) == 4:
-                base = cxxcimod.BinaryQuadraticModel_tuple4_Dict
-            else:
-                raise TypeError("invalid length of tuple")
+    if isinstance(ind, int):
+        base = cxxcimod.BinaryQuadraticModel_Dict
+    elif isinstance(ind, str):
+        base = cxxcimod.BinaryQuadraticModel_str_Dict
+    elif isinstance(ind, tuple):
+        if len(ind) == 2:
+            base = cxxcimod.BinaryQuadraticModel_tuple2_Dict
+        elif len(ind) == 3:
+            base = cxxcimod.BinaryQuadraticModel_tuple3_Dict
+        elif len(ind) == 4:
+            base = cxxcimod.BinaryQuadraticModel_tuple4_Dict
         else:
-            raise TypeError("invalid types of linear and quadratic")
+            raise TypeError("invalid length of tuple")
+    else:
+        raise TypeError("invalid types of linear and quadratic")
 
-    # now define class
+
+
     class BinaryQuadraticModel(base):
         """Represents Binary quadratic model. 
            Note that the indices are converted to the integers internally. 
@@ -92,15 +91,15 @@ def make_BinaryQuadraticModel(linear, quadratic):
             # ind to num
             self._ind_to_num = None
 
-    
+
         @property
         def linear(self):
             return self.get_linear()
-    
+
         @property
         def quadratic(self):
             return self.get_quadratic()
-    
+
         @property
         def num_variables(self):
             return self.get_num_variables()
@@ -108,16 +107,12 @@ def make_BinaryQuadraticModel(linear, quadratic):
         @property
         def variables(self):
             return self.get_variables()
-    
+
         @property
         def vartype(self):
             vartype = super().get_vartype()
-            if vartype == cxxcimod.Vartype.SPIN:
-                return dimod.SPIN
-            else:
-                #BINARY
-                return dimod.BINARY
-    
+            return dimod.SPIN if vartype == cxxcimod.Vartype.SPIN else dimod.BINARY
+
         @property
         def offset(self):
             return self.get_offset()
@@ -140,7 +135,7 @@ def make_BinaryQuadraticModel(linear, quadratic):
 
             return self._indices, self._ind_to_num
 
-    
+
         def interaction_matrix(self):
             """make Dense-type interaction matrix
             The Ising model: E = ΣJ_ij σiσj + Σhiσi
@@ -149,16 +144,16 @@ def make_BinaryQuadraticModel(linear, quadratic):
             Returns:
                 numpy.ndarray: interactioin matrix H_{ij} or Q_{ij}, energy_bias (float)
             """
-    
+
             if self._re_calculate is True:
-    
+
                 # calculate interaction matrix
                 indices, ind_to_num = self.update_indices()
                 self._interaction_matrix = super().interaction_matrix(indices)
                 self._re_calculate = False
-    
+
             return self._interaction_matrix
-    
+
         def energy(self, sample, sparse=False, convert_sample=False):
             """Determine the energy of the specified sample of a binary quadratic model.
             Args:
@@ -172,9 +167,9 @@ def make_BinaryQuadraticModel(linear, quadratic):
             indices, ind_to_num = self.update_indices()
 
             # convert sample to dict
-            if isinstance(sample, list) or isinstance(sample, np.ndarray):
+            if isinstance(sample, (list, np.ndarray)):
                 sample = {indices[i]:elem for i,elem in enumerate(sample)}
-    
+
             # convert samples to SPIN or BINARY
             if convert_sample:
                 for k in sample.keys():
@@ -182,114 +177,108 @@ def make_BinaryQuadraticModel(linear, quadratic):
                         sample[k] = 0
                     if sample[k] == 0  and self.vartype == dimod.SPIN:
                         sample[k] = -1
-    
+
             if sparse:
-               return super().energy(sample)
-    
-            else:
-                # convert to array
-                if isinstance(sample, dict):
-                    state = [0] * len(sample)
-                    for k,v in sample.items():
-                        state[ind_to_num[k]] = v
-                    sample = state
-    
-                sample = np.array(sample)
-    
-                int_mat = self.interaction_matrix()
-    
-                # calculate 
-                if self.vartype == dimod.BINARY:
-                    return np.dot(sample, np.dot(np.triu(int_mat), sample)) + self.get_offset()
-                elif self.vartype == dimod.SPIN:
-                    linear_term = np.diag(int_mat)
-                    energy = (np.dot(sample, np.dot(int_mat, sample)) -
-                          np.sum(linear_term))/2
-                    energy += np.dot(linear_term, sample)
-                    energy += self.get_offset()
-                return energy 
-    
+                return super().energy(sample)
+
+            # convert to array
+            if isinstance(sample, dict):
+                state = [0] * len(sample)
+                for k,v in sample.items():
+                    state[ind_to_num[k]] = v
+                sample = state
+
+            sample = np.array(sample)
+
+            int_mat = self.interaction_matrix()
+
+            # calculate 
+            if self.vartype == dimod.BINARY:
+                return np.dot(sample, np.dot(np.triu(int_mat), sample)) + self.get_offset()
+            elif self.vartype == dimod.SPIN:
+                linear_term = np.diag(int_mat)
+                energy = (np.dot(sample, np.dot(int_mat, sample)) -
+                      np.sum(linear_term))/2
+                energy += np.dot(linear_term, sample)
+                energy += self.get_offset()
+            return energy 
+
         def energies(self, samples_like, **kwargs):
-            en_vec = []
-    
-            for elem in samples_like:
-                en_vec.append(self.energy(elem, **kwargs))
-    
-            return en_vec
-    
+            return [self.energy(elem, **kwargs) for elem in samples_like]
+
         @recalc
         def empty(self, *args, **kwargs):
             return super().empty(*args, **kwargs)
-    
+
         @recalc
         def add_variable(self, *args, **kwargs):
             return super().add_variable(*args, **kwargs)
-    
+
         @recalc
         def add_variables_from(self, *args, **kwargs):
             return super().add_variables_from(*args, **kwargs)
-    
+
         @recalc
         def add_interaction(self, *args, **kwargs):
             return super().add_interaction(*args, **kwargs)
-    
+
         @recalc
         def add_interactions_from(self, *args, **kwargs):
             return super().add_interactions_from(*args, **kwargs)
-    
+
         @recalc
         def remove_variable(self, *args, **kwargs):
             return super().remove_variable(*args, **kwargs)
-    
+
         @recalc
         def remove_variables_from(self, *args, **kwargs):
             return super().remove_variables_from(*args, **kwargs)
-    
+
         @recalc
         def remove_interaction(self, *args, **kwargs):
             return super().remove_interaction(*args, **kwargs)
-    
+
         @recalc
         def remove_interactions_from(self, *args, **kwargs):
             return super().remove_interactions_from(*args, **kwargs)
-    
+
         @recalc
         def add_offset(self, *args, **kwargs):
             return super().add_offset(*args, **kwargs)
-    
+
         @recalc
         def remove_offset(self, *args, **kwargs):
             return super().remove_offset(*args, **kwargs)
-    
+
         @recalc
         def scale(self, *args, **kwargs):
            return super().scale(*args, **kwargs)
-    
+
         @recalc
         def normalize(self, *args, **kwargs):
            return super().normalize(*args, **kwargs)
-    
+
         @recalc
         def fix_variable(self, *args, **kwargs):
             return super().fix_variable(*args, **kwargs)
-    
+
         @recalc
         def fix_variables(self, *args, **kwargs):
             return super().fix_variables(*args, **kwargs)
-    
+
         @recalc
         def flip_variable(self, *args, **kwargs):
             return super().flip_variable(*args, **kwargs)
-    
+
         @recalc
         def update(self, *args, **kwargs):
             return super().update(*args, **kwargs)
-    
+
         @recalc
         def contract_variables(self, *args, **kwargs):
             return super().contract_variables(*args, **kwargs)
-    
-    
+
+
         def change_vartype(self, vartype, inplace=None):
             """
             Create a binary quadratic model with the specified vartype
@@ -345,6 +334,7 @@ def make_BinaryQuadraticModel(linear, quadratic):
             return cls(linear, quadratic, offset, vartype)
 
 
+
     return BinaryQuadraticModel
 
 # for JSON
@@ -372,7 +362,7 @@ def BinaryQuadraticModel(linear, quadratic, *args, **kwargs):
     elif len(args) == 1:
         [vartype] = args
         return Model(linear, quadratic, 0.0, to_cxxcimod(vartype))
-    elif len(args) == 0 and 'vartype' in kwargs:
+    elif not args and 'vartype' in kwargs:
         vartype = kwargs['vartype']
         return Model(linear, quadratic, 0.0, to_cxxcimod(vartype))
     else:

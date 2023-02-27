@@ -29,78 +29,80 @@ def get_cxxcimod_class(linear, quadratic, sparse):
         index.add(next(iter(quadratic))[0])
         index.add(next(iter(quadratic))[1])
 
-    if len(set(type(i) for i in index)) != 1:
+    if len({type(i) for i in index}) != 1:
         raise TypeError("invalid types of linear and quadratic")
-    else:
+    ind = next(iter(index))
 
-        ind = next(iter(index))
-
-        if sparse:
-            if isinstance(ind, int):
-                base = cxxcimod.BinaryQuadraticModel_Sparse
-            elif isinstance(ind, str):
-                base = cxxcimod.BinaryQuadraticModel_str_Sparse
-            elif isinstance(ind, tuple):
-                if len(ind) == 2:
-                    base = cxxcimod.BinaryQuadraticModel_tuple2_Sparse
-                elif len(ind) == 3:
-                    base = cxxcimod.BinaryQuadraticModel_tuple3_Sparse
-                elif len(ind) == 4:
-                    base = cxxcimod.BinaryQuadraticModel_tuple4_Sparse
-                else:
-                    raise TypeError("invalid length of tuple")
+    if sparse:
+        if isinstance(ind, int):
+            base = cxxcimod.BinaryQuadraticModel_Sparse
+        elif isinstance(ind, str):
+            base = cxxcimod.BinaryQuadraticModel_str_Sparse
+        elif isinstance(ind, tuple):
+            if len(ind) == 2:
+                base = cxxcimod.BinaryQuadraticModel_tuple2_Sparse
+            elif len(ind) == 3:
+                base = cxxcimod.BinaryQuadraticModel_tuple3_Sparse
+            elif len(ind) == 4:
+                base = cxxcimod.BinaryQuadraticModel_tuple4_Sparse
             else:
-                raise TypeError("invalid types of linear and quadratic")
+                raise TypeError("invalid length of tuple")
         else:
-            if isinstance(ind, int):
-                base = cxxcimod.BinaryQuadraticModel_Dense
-            elif isinstance(ind, str):
-                base = cxxcimod.BinaryQuadraticModel_str_Dense
-            elif isinstance(ind, tuple):
-                if len(ind) == 2:
-                    base = cxxcimod.BinaryQuadraticModel_tuple2_Dense
-                elif len(ind) == 3:                             
-                    base = cxxcimod.BinaryQuadraticModel_tuple3_Dense
-                elif len(ind) == 4:
-                    base = cxxcimod.BinaryQuadraticModel_tuple4_Dense
-                else:
-                    raise TypeError("invalid length of tuple")
-            else:
-                raise TypeError("invalid types of linear and quadratic")
+            raise TypeError("invalid types of linear and quadratic")
+    elif isinstance(ind, int):
+        base = cxxcimod.BinaryQuadraticModel_Dense
+    elif isinstance(ind, str):
+        base = cxxcimod.BinaryQuadraticModel_str_Dense
+    elif isinstance(ind, tuple):
+        if len(ind) == 2:
+            base = cxxcimod.BinaryQuadraticModel_tuple2_Dense
+        elif len(ind) == 3:                             
+            base = cxxcimod.BinaryQuadraticModel_tuple3_Dense
+        elif len(ind) == 4:
+            base = cxxcimod.BinaryQuadraticModel_tuple4_Dense
+        else:
+            raise TypeError("invalid length of tuple")
+    else:
+        raise TypeError("invalid types of linear and quadratic")
 
     return base
 
 def extract_offset_and_vartype(*args, **kwargs):
-    if kwargs == {}:
-        if len(args) == 0:
-            raise TypeError(f"Offset or vartype is configured incorrectly. Vartype must be set.")
-        elif len(args) == 1:
-            offset = 0.0
-            [vartype] = args
-        elif len(args) == 2:
-             [offset, vartype] = args
-        else:
-            raise TypeError(f"Offset or vartype is configured incorrectly. Vartype must be set.")
-    else:
+    if kwargs:
         if 'offset' in kwargs and 'vartype' in kwargs:
             offset  = kwargs['offset']
             vartype = kwargs['vartype']
         elif 'offset' in kwargs:
             if len(args) != 1:
-                raise TypeError(f"Offset or vartype is configured incorrectly. Vartype must be set.")
+                raise TypeError(
+                    "Offset or vartype is configured incorrectly. Vartype must be set."
+                )
             offset  = kwargs['offset']
             [vartype] = args
         elif 'vartype' in kwargs:
             if len(args) >= 2:
-                raise TypeError(f"Offset or vartype is configured incorrectly. Vartype must be set.")
-            elif len(args) == 0:
+                raise TypeError(
+                    "Offset or vartype is configured incorrectly. Vartype must be set."
+                )
+            elif not args:
                 offset = 0.0
             elif len(args) == 1:
                 [offset] = args
             vartype = kwargs['vartype']
         else:
-            raise TypeError(f"Offset or vartype is configured incorrectly. Vartype must be set.")
-            
+            raise TypeError(
+                "Offset or vartype is configured incorrectly. Vartype must be set."
+            )
+
+    elif not args or len(args) not in [1, 2]:
+        raise TypeError(
+            "Offset or vartype is configured incorrectly. Vartype must be set."
+        )
+    elif len(args) == 1:
+        offset = 0.0
+        [vartype] = args
+    else:
+        [offset, vartype] = args
     return offset,vartype
 
 def make_BinaryQuadraticModel(linear, quadratic, sparse):
@@ -116,7 +118,8 @@ def make_BinaryQuadraticModel(linear, quadratic, sparse):
 
     Base = get_cxxcimod_class(linear, quadratic, sparse)
 
-    # now define class
+
+
     class BinaryQuadraticModel(Base):
         """Represents Binary quadratic model. 
            Note that the indices are converted to the integers internally. 
@@ -152,58 +155,51 @@ def make_BinaryQuadraticModel(linear, quadratic, sparse):
 
         @staticmethod
         def _generate_mat(linear, quadratic, include_quaddiag):
-                labels = set()
+            labels = set(linear.keys())
+            for i,j in quadratic.keys():
+                if i == j and include_quaddiag == False:
+                    raise RuntimeError("No self-loop allowed")
 
-                for i in linear.keys():
-                    labels.add(i)
+                labels.add(i)
+                labels.add(j)
 
-                for i,j in quadratic.keys():
-                    if i == j and include_quaddiag == False:
-                        raise RuntimeError("No self-loop allowed")
+            idx_to_label = sorted(labels)
+            label_to_idx = {elem: k for k,elem in enumerate(idx_to_label)}
 
-                    labels.add(i)
-                    labels.add(j)
+            mat_size = len(idx_to_label) + 1
 
-                idx_to_label = sorted(labels)
-                label_to_idx = {elem: k for k,elem in enumerate(idx_to_label)}
+            mat = np.zeros(shape=(mat_size, mat_size))
+            mat[mat_size-1, mat_size-1] = 1
 
-                mat_size = len(idx_to_label) + 1
+            for i,val in linear.items():
+                mat[label_to_idx[i], mat_size-1] += val
 
-                mat = np.zeros(shape=(mat_size, mat_size))
-                mat[mat_size-1, mat_size-1] = 1
+            for (i,j),val in quadratic.items():
+                idx_i = label_to_idx[i]
+                idx_j = label_to_idx[j]
+                if idx_i != idx_j:
+                    mat[min(idx_i, idx_j), max(idx_i, idx_j)] += val
+                else:
+                    mat[idx_i, mat_size-1] += val
 
-                for i,val in linear.items():
-                    mat[label_to_idx[i], mat_size-1] += val
+            return mat,idx_to_label
 
-                for (i,j),val in quadratic.items():
-                    idx_i = label_to_idx[i]
-                    idx_j = label_to_idx[j]
-                    if idx_i != idx_j:
-                        mat[min(idx_i, idx_j), max(idx_i, idx_j)] += val
-                    else:
-                        mat[idx_i, mat_size-1] += val
-
-                return mat,idx_to_label
 
 
 
         @property
         def vartype(self):
             vartype = super().get_vartype()
-            if vartype == cxxcimod.Vartype.SPIN:
-                return dimod.SPIN
-            else:
-                #BINARY
-                return dimod.BINARY
+            return dimod.SPIN if vartype == cxxcimod.Vartype.SPIN else dimod.BINARY
 
         @property
         def linear(self):
             return self.get_linear()
-    
+
         @property
         def quadratic(self):
             return self.get_quadratic()
-    
+
         @property
         def offset(self):
             return self.get_offset()
@@ -211,7 +207,7 @@ def make_BinaryQuadraticModel(linear, quadratic, sparse):
         @property
         def num_variables(self):
             return self.get_num_variables()
-    
+
         @property
         def variables(self):
             return self.get_variables()
@@ -250,7 +246,7 @@ def make_BinaryQuadraticModel(linear, quadratic, sparse):
         @classmethod
         def from_numpy_matrix(cls, mat, variables: list, offset=0.0, vartype='BINARY', fix_format=True, **kwargs):
             shape = np.shape(mat)
-            if not (len(shape) == 2 and shape[0] == shape[1]):
+            if len(shape) != 2 or shape[0] != shape[1]:
                 raise TypeError("numpy matrix has to be a square matrix")
 
             return cls(mat, variables, offset, vartype, fix_format, **kwargs)
@@ -277,6 +273,7 @@ def make_BinaryQuadraticModel(linear, quadratic, sparse):
         def from_serializable(cls, obj, **kwargs):
             cxxbqm = Base.from_serializable(obj)
             return cls(cxxbqm, **kwargs)
+
 
 
 
